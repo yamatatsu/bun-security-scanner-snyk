@@ -1,0 +1,147 @@
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.1, v2.0.0 etc.
+
+permissions:
+  contents: write  # Required for creating GitHub releases
+  id-token: write  # Required for npm provenance
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for proper provenance
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        run: bun test
+
+      - name: Run type checking
+        run: bun run typecheck
+
+      - name: Run linting
+        run: bun run lint
+
+      - name: Verify version matches tag
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          PKG_VERSION=$(node -p "require('./package.json').version")
+
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)"
+            exit 1
+          fi
+
+          echo "Version verified: $TAG_VERSION"
+
+      - name: Verify package contents
+        run: |
+          echo "Package contents that will be published:"
+          npm pack --dry-run
+          echo ""
+
+          # Verify critical files are included
+          if ! npm pack --dry-run | grep -q "src/index.ts"; then
+            echo "::error::Critical file src/index.ts missing from package"
+            exit 1
+          fi
+
+          # Check package size
+          SIZE=$(npm pack --json --dry-run | jq '.[0].size')
+          SIZE_MB=$((SIZE / 1048576))
+          echo "Package size: $SIZE bytes ($SIZE_MB MB)"
+
+          if [ "$SIZE" -gt 10485760 ]; then
+            echo "::warning::Package size ($SIZE_MB MB) exceeds 10MB"
+          fi
+
+      - name: Setup Node.js (for npm publish)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish to npm with provenance
+        id: npm_publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION_NUM="${VERSION#v}"
+
+          # Extract changelog section for this version
+          awk -v version="$VERSION_NUM" '
+            /^## \['"$VERSION_NUM"'\]/ { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > /tmp/release_notes.txt
+
+          # If no changelog found, use generic message
+          if [ ! -s /tmp/release_notes.txt ]; then
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md) for release notes." > /tmp/release_notes.txt
+          fi
+
+          echo "changelog_file=/tmp/release_notes.txt" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: ${{ steps.changelog.outputs.changelog_file }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          append_body: true
+
+      - name: Add release metadata comment
+        if: steps.npm_publish.outcome == 'success'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          append_body: true
+          body: |
+
+            ---
+
+            ## Published to npm
+
+            - **Version**: ${{ github.ref_name }}
+            - **npm Package**: https://www.npmjs.com/package/bun-osv-scanner/v/${{ github.ref_name }}
+            - **Provenance**: Enabled (cryptographically signed)
+
+            ## Supply Chain Security
+
+            This release includes npm provenance attestations that cryptographically link this package to:
+            - Source code repository: ${{ github.repository }}
+            - Build workflow: ${{ github.workflow }}
+            - Commit SHA: ${{ github.sha }}
+
+            Verify provenance: `npm audit signatures`
+
+      - name: Rollback warning
+        if: failure() && steps.npm_publish.outcome == 'success'
+        run: |
+          echo "::error::Release creation failed after npm publish!"
+          echo "::warning::Package ${{ github.ref_name }} is live on npm but GitHub release failed"
+          echo "::notice::Create release manually or use: gh release create ${{ github.ref_name }}"

@@ -150,19 +150,17 @@ The scanner is built with a modular, production-ready architecture:
 
 ```
 src/
-├── api/
-│   └── client.ts           # OSV.dev API client with batch support
-├── scanner/
-│   └── processor.ts        # Vulnerability processing and advisory generation
-├── utils/
-│   ├── retry.ts           # Robust retry logic with exponential backoff
-│   ├── semver.ts          # OSV semver range matching
-│   └── severity.ts        # CVSS and severity assessment
-├── constants.ts           # Centralized configuration management
-├── logger.ts             # Structured logging with configurable levels
+├── index.ts              # Main scanner implementation
+├── client.ts             # OSV.dev API client with batch support
+├── processor.ts          # Vulnerability processing and advisory generation
+├── cli.ts                # CLI interface for testing
 ├── schema.ts             # Zod schemas for OSV API responses
-├── types.ts              # TypeScript type definitions
-└── index.ts              # Main scanner implementation
+├── constants.ts          # Centralized configuration management
+├── logger.ts             # Structured logging with configurable levels
+├── retry.ts              # Robust retry logic with exponential backoff
+├── semver.ts             # OSV semver range matching
+├── severity.ts           # CVSS and severity assessment
+└── types.ts              # TypeScript type definitions
 ```
 
 ### Key Design Principles
@@ -284,7 +282,7 @@ MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-**Last Updated**: September 12, 2025  
-**Version**: 1.0.0
+**Last Updated**: November 3, 2025
+**Version**: 1.0.1
 
 *This documentation is a living document and will be updated as the project evolves and new features are added.*

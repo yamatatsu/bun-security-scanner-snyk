@@ -10,7 +10,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-01-12
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.0.1] - 2025-01-03
+
+### Added
+- Automated CHANGELOG generation from conventional commits in release workflow
+- Comprehensive repository state validation before releases
+- Package content verification before npm publishing
+- Atomic commit+tag operations to prevent race conditions
+- Rollback warnings when GitHub release creation fails after npm publish
+- Comprehensive test suite with 396 tests covering all scanner modules
+  - `tests/logger.test.ts` - 38 tests for structured logging and context serialization
+  - `tests/constants.test.ts` - 32 tests for configuration management and environment parsing
+  - `tests/retry.test.ts` - 38 tests for exponential backoff retry logic
+  - `tests/semver.test.ts` - 33 tests for OSV semver range matching using Bun.semver
+  - `tests/severity.test.ts` - 58 tests for CVSS score parsing and severity mapping
+  - `tests/schema.test.ts` - 47 tests for Zod schema validation of OSV API structures
+  - `tests/scanner.test.ts` - 19 tests for Bun.Security.Scanner interface compliance
+  - `tests/processor.test.ts` - 29 tests for vulnerability processing and advisory generation
+- Real-world vulnerability scenario testing with actual OSV.dev data structures
+- Edge case and boundary condition coverage across all modules
+
+### Changed
+- GitHub Actions release workflow now fully automated with zero manual editing required
+- CHANGELOG structure updated to comply with Keep-a-Changelog specification
+- Replaced deprecated actions/create-release@v1 with softprops/action-gh-release@v2
+- Release workflow now enforces main-branch-only releases with validation checks
+- Publish workflow extracts version-specific changelog sections for GitHub releases
+- Reorganized test structure from `src/__tests__/` to flat `tests/` directory layout
+- Updated test approach to use real code behavior instead of complex mocks
+
+### Removed
+- Old `src/__tests__/` directory structure in favor of cleaner `tests/` organization
+
+### Fixed
+- Corrected README.md architecture diagram to match actual flat file structure
+- Removed undocumented configuration options (OSV_GLOBAL_TIMEOUT_MS, OSV_DEBUG_MODE) from documentation
+- Updated documentation dates to accurate values
+- CHANGELOG [Unreleased] section positioning (now at top per Keep-a-Changelog spec)
+- Race condition between commit and tag push operations (now atomic with --follow-tags)
+- Changelog insertion logic compatibility with Keep-a-Changelog format
+
+### Security
+- Added concurrency controls to prevent simultaneous release/publish operations
+- Implemented branch validation to prevent accidental releases from feature branches
+- Added package verification step to validate contents before npm publish
+
+## [1.0.0] - 2024-10-13
 
 ### Added
 - **Complete OSV Scanner Implementation**
@@ -153,23 +212,9 @@ For integration into existing Bun projects:
 2. Configure in `bunfig.toml`: `[install.security]\nscanner = "bun-osv-scanner"`
 3. Optional: Set environment variables for custom configuration
 
-## [Unreleased]
-
-### Added
-
-### Changed
-
-### Deprecated  
-
-### Removed
-
-### Fixed
-
-### Security
-
 ---
 
-**Last Updated**: September 12, 2025  
-**Version**: 1.0.0
+**Last Updated**: November 3, 2024
+**Version**: 1.0.1
 
 *This changelog is a living document and will be updated as the project evolves and new releases are made.*

@@ -101,6 +101,8 @@ export class VulnerabilityProcessor {
 		const description = this.getVulnerabilityDescription(vuln);
 
 		return {
+			id: vuln.id,
+			message: vuln.summary || vuln.details || vuln.id,
 			level,
 			package: pkg.name,
 			url,

@@ -9,12 +9,20 @@
 // OSV API related types
 export type FatalSeverity = "CRITICAL" | "HIGH";
 
-// Extend global Bun namespace with missing semver types
+// Extend global Bun namespace with missing types
 declare global {
 	namespace Bun {
 		// Bun.semver types (missing from current bun-types)
 		namespace semver {
 			function satisfies(version: string, range: string): boolean;
+		}
+
+		// Augment Bun.Security.Advisory with missing properties
+		namespace Security {
+			interface Advisory {
+				id: string;
+				message: string;
+			}
 		}
 	}
 }

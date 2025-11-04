@@ -41,6 +41,8 @@ coverage/
 *.lcov
 
 # Claude Code file
-CLAUDE.md
 .claude/
 .claude.json
+
+# NPM Registry
+.npmrc
