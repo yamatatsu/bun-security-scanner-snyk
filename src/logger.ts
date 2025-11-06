@@ -8,6 +8,8 @@
  * Provides consistent, configurable logging with proper levels and context
  */
 
+import { ENV } from "./constants.js";
+
 export type LogLevel = "debug" | "info" | "warn" | "error";
 export type LogContext = Record<string, unknown>;
 
@@ -30,7 +32,7 @@ class OSVLogger implements Logger {
 	}
 
 	private get minLevel(): LogLevel {
-		return this.parseLogLevel(process.env.OSV_LOG_LEVEL) || "info";
+		return this.parseLogLevel(process.env[ENV.LOG_LEVEL]) || "info";
 	}
 
 	private shouldLog(level: LogLevel): boolean {

@@ -12,17 +12,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING CHANGE
+- Migrated from manual release workflow to automated semantic-release
+- Release process now triggered automatically on push to main
+- Conventional commit format now required (feat/fix/docs/etc)
+
 ### Added
+- Unified CI/CD workflow with semantic-release automation
+- OIDC authentication for npm (no more token management)
+- Automatic provenance generation on npm packages
+- TruffleHog secret scanning in CI
+- OSV vulnerability scanning in CI
+- Comprehensive release rules for 11 commit types
 
 ### Changed
-
-### Deprecated
+- Domain updated: bun-osv-scanner.com → osv.bun-security-scanner.com
+- Logger refactored to use centralized ENV constants from constants.ts
+- Biome configured to respect VCS ignore files (useIgnoreFile: true)
+- Automatic version bumping from commit types (feat→minor, fix→patch, BREAKING→major)
+- Automatic CHANGELOG.md generation and Git commit
+- Automatic GitHub releases with npm tarball assets
+- Automatic npm publishing with provenance attestations (via OIDC)
 
 ### Removed
-
-### Fixed
+- Manual release.yml workflow (233 lines)
+- Tag-triggered publish.yml workflow (148 lines)
+- Copyright headers from config files for cleaner configs
 
 ### Security
+- OIDC eliminates long-lived npm token storage and rotation
+- Automatic npm package provenance attestations
+- Minimal permission model per workflow job
+- persist-credentials:false in checkout steps
 
 ## [1.0.1] - 2025-01-03
 
