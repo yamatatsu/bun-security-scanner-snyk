@@ -1,13 +1,16 @@
 {
-	"name": "@bun-security-scanner/osv",
-	"version": "1.0.0",
-	"description": "OSV vulnerability scanner for Bun projects",
-	"author": "maloma7",
+	"name": "bun-security-scanner-snyk",
+	"version": "0.1.0",
+	"description": "Snyk vulnerability scanner for Bun projects - Shai-Hulud worm protection",
+	"author": "Tatsuya Yamamoto <the.kinnikuman@gmail.com> (https://github.com/yamatatsu)",
+	"contributors": [
+		"maloma7 (Original OSV Scanner - https://github.com/maloma7/bun-osv-scanner)"
+	],
 	"license": "MIT",
 	"type": "module",
 	"types": "./src/index.ts",
 	"exports": "./src/index.ts",
-	"packageManager": "bun@1.3.0",
+	"packageManager": "bun@1.3.3",
 	"engines": {
 		"bun": ">=1.0.0"
 	},
@@ -22,26 +25,25 @@
 	],
 	"keywords": [
 		"bun",
-		"osv",
+		"snyk",
 		"security",
 		"security-scanner",
 		"vulnerability",
 		"vulnerability-scanner",
 		"scanner",
 		"audit",
-		"dependencies"
+		"dependencies",
+		"shai-hulud",
+		"supply-chain",
+		"supply-chain-security"
 	],
-	"homepage": "https://osv.bun-security-scanner.com",
+	"homepage": "https://snyk.bun-security-scanner.com",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/bun-security-scanner/osv.git"
+		"url": "git+https://github.com/yamatatsu/bun-security-scanner-snyk.git"
 	},
 	"bugs": {
-		"url": "https://github.com/bun-security-scanner/osv/issues"
-	},
-	"funding": {
-		"type": "github",
-		"url": "https://github.com/sponsors/bun-security-scanner"
+		"url": "https://github.com/yamatatsu/bun-security-scanner-snyk/issues"
 	},
 	"scripts": {
 		"dev": "bun run typecheck --watch",

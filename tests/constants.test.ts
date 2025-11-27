@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import {
 	ENV,
 	HTTP,
-	OSV_API,
+	SNYK_API,
 	PERFORMANCE,
 	SECURITY,
 	getConfig,
@@ -25,38 +25,42 @@ describe("Constants", () => {
 		}
 	});
 
-	describe("OSV_API Constants", () => {
+	describe("SNYK_API Constants", () => {
 		test("has correct base URL", () => {
-			expect(OSV_API.BASE_URL).toBe("https://api.osv.dev/v1");
+			expect(SNYK_API.BASE_URL).toBe("https://api.snyk.io/rest");
 		});
 
 		test("has reasonable timeout", () => {
-			expect(OSV_API.TIMEOUT_MS).toBe(30000);
-			expect(OSV_API.TIMEOUT_MS).toBeGreaterThan(0);
+			expect(SNYK_API.TIMEOUT_MS).toBe(30000);
+			expect(SNYK_API.TIMEOUT_MS).toBeGreaterThan(0);
 		});
 
 		test("has valid batch size limit", () => {
-			expect(OSV_API.MAX_BATCH_SIZE).toBe(1000);
-			expect(OSV_API.MAX_BATCH_SIZE).toBeGreaterThan(0);
+			expect(SNYK_API.MAX_BATCH_SIZE).toBe(100);
+			expect(SNYK_API.MAX_BATCH_SIZE).toBeGreaterThan(0);
 		});
 
 		test("has retry configuration", () => {
-			expect(OSV_API.MAX_RETRY_ATTEMPTS).toBe(2);
-			expect(OSV_API.RETRY_DELAY_MS).toBe(1000);
+			expect(SNYK_API.MAX_RETRY_ATTEMPTS).toBe(2);
+			expect(SNYK_API.RETRY_DELAY_MS).toBe(1000);
 		});
 
-		test("has default ecosystem", () => {
-			expect(OSV_API.DEFAULT_ECOSYSTEM).toBe("npm");
+		test("has API version", () => {
+			expect(SNYK_API.API_VERSION).toBe("2024-10-15");
+		});
+
+		test("has rate limit configuration", () => {
+			expect(SNYK_API.RATE_LIMIT_PER_MINUTE).toBe(180);
 		});
 	});
 
 	describe("HTTP Constants", () => {
 		test("has correct content type", () => {
-			expect(HTTP.CONTENT_TYPE).toBe("application/json");
+			expect(HTTP.CONTENT_TYPE).toBe("application/vnd.api+json");
 		});
 
 		test("has user agent", () => {
-			expect(HTTP.USER_AGENT).toMatch(/bun-osv-scanner/);
+			expect(HTTP.USER_AGENT).toMatch(/bun-snyk-scanner/);
 		});
 	});
 
@@ -102,10 +106,12 @@ describe("Constants", () => {
 
 	describe("ENV Constants", () => {
 		test("has correct environment variable names", () => {
-			expect(ENV.LOG_LEVEL).toBe("OSV_LOG_LEVEL");
-			expect(ENV.API_BASE_URL).toBe("OSV_API_BASE_URL");
-			expect(ENV.TIMEOUT_MS).toBe("OSV_TIMEOUT_MS");
-			expect(ENV.DISABLE_BATCH).toBe("OSV_DISABLE_BATCH");
+			expect(ENV.LOG_LEVEL).toBe("SNYK_LOG_LEVEL");
+			expect(ENV.API_BASE_URL).toBe("SNYK_API_BASE_URL");
+			expect(ENV.TIMEOUT_MS).toBe("SNYK_TIMEOUT_MS");
+			expect(ENV.DISABLE_BATCH).toBe("SNYK_DISABLE_BATCH");
+			expect(ENV.API_TOKEN).toBe("SNYK_API_TOKEN");
+			expect(ENV.ORG_ID).toBe("SNYK_ORG_ID");
 		});
 	});
 
@@ -188,37 +194,37 @@ describe("Constants", () => {
 
 	describe("Real-World Configuration", () => {
 		test("gets API base URL from environment", () => {
-			Bun.env.OSV_API_BASE_URL = "https://custom.api.test";
-			const result: string = getConfig(ENV.API_BASE_URL, OSV_API.BASE_URL);
+			Bun.env.SNYK_API_BASE_URL = "https://custom.api.test";
+			const result: string = getConfig(ENV.API_BASE_URL, SNYK_API.BASE_URL);
 			expect(result).toEqual("https://custom.api.test");
 		});
 
 		test("gets timeout from environment", () => {
-			Bun.env.OSV_TIMEOUT_MS = "60000";
-			const result: number = getConfig(ENV.TIMEOUT_MS, OSV_API.TIMEOUT_MS);
+			Bun.env.SNYK_TIMEOUT_MS = "60000";
+			const result: number = getConfig(ENV.TIMEOUT_MS, SNYK_API.TIMEOUT_MS);
 			expect(result).toEqual(60000);
 		});
 
 		test("gets batch disable flag from environment", () => {
-			Bun.env.OSV_DISABLE_BATCH = "true";
+			Bun.env.SNYK_DISABLE_BATCH = "true";
 			const result = getConfig(ENV.DISABLE_BATCH, false);
 			expect(result).toBe(true);
 		});
 
 		test("uses defaults when no env vars set", () => {
-			const baseUrl = getConfig(ENV.API_BASE_URL, OSV_API.BASE_URL);
-			const timeout = getConfig(ENV.TIMEOUT_MS, OSV_API.TIMEOUT_MS);
+			const baseUrl = getConfig(ENV.API_BASE_URL, SNYK_API.BASE_URL);
+			const timeout = getConfig(ENV.TIMEOUT_MS, SNYK_API.TIMEOUT_MS);
 			const disableBatch = getConfig(ENV.DISABLE_BATCH, false);
 
-			expect(baseUrl).toBe(OSV_API.BASE_URL);
-			expect(timeout).toBe(OSV_API.TIMEOUT_MS);
+			expect(baseUrl).toBe(SNYK_API.BASE_URL);
+			expect(timeout).toBe(SNYK_API.TIMEOUT_MS);
 			expect(disableBatch).toBe(false);
 		});
 	});
 
 	describe("Type Safety", () => {
-		test("OSV_API is readonly", () => {
-			const constants = OSV_API;
+		test("SNYK_API is readonly", () => {
+			const constants = SNYK_API;
 			expect(Object.isFrozen(constants)).toBe(false); // Not frozen, but readonly in TS
 			expect(constants.BASE_URL).toBeTruthy();
 		});
@@ -232,20 +238,20 @@ describe("Constants", () => {
 
 	describe("Validation", () => {
 		test("timeout is positive", () => {
-			expect(OSV_API.TIMEOUT_MS).toBeGreaterThan(0);
+			expect(SNYK_API.TIMEOUT_MS).toBeGreaterThan(0);
 		});
 
 		test("max batch size is reasonable", () => {
-			expect(OSV_API.MAX_BATCH_SIZE).toBeGreaterThan(0);
-			expect(OSV_API.MAX_BATCH_SIZE).toBeLessThanOrEqual(10000);
+			expect(SNYK_API.MAX_BATCH_SIZE).toBeGreaterThan(0);
+			expect(SNYK_API.MAX_BATCH_SIZE).toBeLessThanOrEqual(10000);
 		});
 
 		test("retry attempts is non-negative", () => {
-			expect(OSV_API.MAX_RETRY_ATTEMPTS).toBeGreaterThanOrEqual(0);
+			expect(SNYK_API.MAX_RETRY_ATTEMPTS).toBeGreaterThanOrEqual(0);
 		});
 
 		test("retry delay is positive", () => {
-			expect(OSV_API.RETRY_DELAY_MS).toBeGreaterThan(0);
+			expect(SNYK_API.RETRY_DELAY_MS).toBeGreaterThan(0);
 		});
 
 		test("CVSS threshold is in valid range", () => {

@@ -1,7 +1,7 @@
 {
-	"name": "bun-osv-scanner",
+	"name": "bun-security-scanner-snyk",
 	"version": "1.0.1",
-	"description": "Security scanner for Bun projects integrating with OSV.dev vulnerability database",
+	"description": "Security scanner for Bun projects integrating with Snyk vulnerability database",
 	"main": "./src/index.ts",
 	"types": "./src/index.ts",
 	"module": "./src/index.ts",
@@ -16,17 +16,17 @@
 		"lint": "bunx @biomejs/biome check .",
 		"typecheck": "bunx tsc --noEmit"
 	},
-	"keywords": ["bun", "security", "scanner", "osv", "vulnerability", "npm"],
-	"author": "maloma7",
+	"keywords": ["bun", "security", "scanner", "snyk", "vulnerability", "npm"],
+	"author": "yamatatsu",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/maloma7/bun-osv-scanner"
+		"url": "https://github.com/bun-security-scanner/snyk"
 	},
 	"bugs": {
-		"url": "https://github.com/maloma7/bun-osv-scanner/issues"
+		"url": "https://github.com/bun-security-scanner/snyk/issues"
 	},
-	"homepage": "https://github.com/maloma7/bun-osv-scanner#readme",
+	"homepage": "https://github.com/bun-security-scanner/snyk#readme",
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@commitlint/cli": "^20.1.0",

@@ -12,11 +12,11 @@ import {
 
 describe("Retry Logic", () => {
 	// Store original log level
-	const _originalLogLevel = process.env.OSV_LOG_LEVEL;
+	const _originalLogLevel = process.env.SNYK_LOG_LEVEL;
 
 	beforeEach(() => {
 		// Set to error to reduce test output noise
-		process.env.OSV_LOG_LEVEL = "error";
+		process.env.SNYK_LOG_LEVEL = "error";
 	});
 
 	describe("Basic Retry Functionality", () => {
@@ -125,8 +125,8 @@ describe("Retry Logic", () => {
 			expect(timestamps.length).toBe(3);
 
 			// Check delays between attempts (allowing some tolerance)
-			const delay1 = timestamps[1]! - timestamps[0]!;
-			const delay2 = timestamps[2]! - timestamps[1]!;
+			const delay1 = (timestamps[1] ?? 0) - (timestamps[0] ?? 0);
+			const delay2 = (timestamps[2] ?? 0) - (timestamps[1] ?? 0);
 
 			// First retry: ~100ms (1.5^0 = 1)
 			// Second retry: ~150ms (1.5^1 = 1.5)
@@ -168,13 +168,13 @@ describe("Retry Logic", () => {
 
 			const delays = [];
 			for (let i = 1; i < timestamps.length; i++) {
-				delays.push(timestamps[i]! - timestamps[i - 1]!);
+				delays.push((timestamps[i] ?? 0) - (timestamps[i - 1] ?? 0));
 			}
 
 			expect(delays.length).toBe(3);
 			// Each subsequent delay should be roughly 1.5x the previous
-			expect(delays[1]!).toBeGreaterThan(delays[0]!);
-			expect(delays[2]!).toBeGreaterThan(delays[1]!);
+			expect(delays[1] ?? 0).toBeGreaterThan(delays[0] ?? 0);
+			expect(delays[2] ?? 0).toBeGreaterThan(delays[1] ?? 0);
 		});
 	});
 
@@ -511,8 +511,8 @@ describe("Retry Logic", () => {
 
 			// Verify increasing delays
 			expect(timestamps.length).toBe(3);
-			const delay1 = timestamps[1]! - timestamps[0]!;
-			const delay2 = timestamps[2]! - timestamps[1]!;
+			const delay1 = (timestamps[1] ?? 0) - (timestamps[0] ?? 0);
+			const delay2 = (timestamps[2] ?? 0) - (timestamps[1] ?? 0);
 			expect(delay2).toBeGreaterThan(delay1);
 		});
 

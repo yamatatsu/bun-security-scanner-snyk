@@ -115,7 +115,7 @@ describe("Package Verification", () => {
 	describe("npm pack Output Parsing", () => {
 		test("parses npm pack --dry-run output for file list", () => {
 			const npmPackOutput = `npm notice
-npm notice 📦  bun-osv-scanner@1.0.1
+npm notice 📦  bun-security-scanner-snyk@1.0.1
 npm notice === Tarball Contents ===
 npm notice 1.2kB LICENSE
 npm notice 3.4kB README.md
@@ -123,9 +123,9 @@ npm notice 567B  package.json
 npm notice 2.3kB src/index.ts
 npm notice 1.5kB src/client.ts
 npm notice === Tarball Details ===
-npm notice name:          bun-osv-scanner
+npm notice name:          bun-security-scanner-snyk
 npm notice version:       1.0.1
-npm notice filename:      bun-osv-scanner-1.0.1.tgz
+npm notice filename:      bun-security-scanner-snyk-1.0.1.tgz
 npm notice package size:  5.2 MB
 npm notice unpacked size: 10.1 MB
 npm notice total files:   5`;
@@ -152,22 +152,22 @@ npm notice 2.3kB src/index.ts`;
 		test("parses JSON output from npm pack", () => {
 			const npmPackJsonOutput = JSON.stringify([
 				{
-					name: "bun-osv-scanner",
+					name: "bun-security-scanner-snyk",
 					version: "1.0.1",
 					size: 5242880, // 5MB
 					unpackedSize: 10485760,
-					filename: "bun-osv-scanner-1.0.1.tgz",
+					filename: "bun-security-scanner-snyk-1.0.1.tgz",
 				},
 			]);
 
 			const parsed = JSON.parse(npmPackJsonOutput);
 			expect(parsed[0].size).toBe(5242880);
-			expect(parsed[0].name).toBe("bun-osv-scanner");
+			expect(parsed[0].name).toBe("bun-security-scanner-snyk");
 		});
 
 		test("validates package structure from JSON output", () => {
 			const packageData = {
-				name: "bun-osv-scanner",
+				name: "bun-security-scanner-snyk",
 				version: "1.0.1",
 				size: 5242880,
 				files: [
@@ -177,7 +177,7 @@ npm notice 2.3kB src/index.ts`;
 				],
 			};
 
-			expect(packageData.name).toBe("bun-osv-scanner");
+			expect(packageData.name).toBe("bun-security-scanner-snyk");
 			expect(packageData.version).toBe("1.0.1");
 			expect(packageData.size).toBeLessThan(10 * 1024 * 1024);
 
@@ -250,7 +250,7 @@ npm notice 2.3kB src/index.ts`;
 	describe("package.json Validation", () => {
 		test("validates required package.json fields", () => {
 			const packageJson = {
-				name: "bun-osv-scanner",
+				name: "bun-security-scanner-snyk",
 				version: "1.0.1",
 				main: "./src/index.ts",
 				types: "./src/index.ts",
@@ -264,7 +264,11 @@ npm notice 2.3kB src/index.ts`;
 		});
 
 		test("validates package.json name format", () => {
-			const validNames = ["bun-osv-scanner", "@scope/package", "package-name"];
+			const validNames = [
+				"bun-security-scanner-snyk",
+				"@scope/package",
+				"package-name",
+			];
 
 			const namePattern =
 				/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
@@ -292,7 +296,7 @@ npm notice 2.3kB src/index.ts`;
 
 		test("validates files field in package.json", () => {
 			const packageJson = {
-				name: "bun-osv-scanner",
+				name: "bun-security-scanner-snyk",
 				version: "1.0.1",
 				files: ["src", "README.md", "LICENSE"],
 			};
@@ -442,7 +446,7 @@ npm notice 2.3kB src/index.ts`;
 			}
 		});
 
-		test("validates actual bun-osv-scanner package structure", () => {
+		test("validates actual bun-security-scanner-snyk package structure", () => {
 			const expectedFiles = [
 				"src/index.ts",
 				"src/client.ts",

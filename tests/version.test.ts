@@ -268,33 +268,33 @@ describe("Version Management", () => {
 
 	describe("Version in URLs and Paths", () => {
 		test("constructs npm package URL with version", () => {
-			const packageName = "bun-osv-scanner";
+			const packageName = "bun-security-scanner-snyk";
 			const version = "v1.0.1";
 			const url = `https://www.npmjs.com/package/${packageName}/v/${version}`;
 
 			expect(url).toBe(
-				"https://www.npmjs.com/package/bun-osv-scanner/v/v1.0.1",
+				"https://www.npmjs.com/package/bun-security-scanner-snyk/v/v1.0.1",
 			);
 		});
 
 		test("constructs GitHub release URL with version", () => {
-			const repo = "maloma7/bun-osv-scanner";
+			const repo = "yamatatsu/bun-security-scanner-snyk";
 			const version = "v1.0.1";
 			const url = `https://github.com/${repo}/releases/tag/${version}`;
 
 			expect(url).toBe(
-				"https://github.com/maloma7/bun-osv-scanner/releases/tag/v1.0.1",
+				"https://github.com/yamatatsu/bun-security-scanner-snyk/releases/tag/v1.0.1",
 			);
 		});
 
 		test("constructs GitHub blob URL with version", () => {
-			const repo = "maloma7/bun-osv-scanner";
+			const repo = "yamatatsu/bun-security-scanner-snyk";
 			const version = "v1.0.1";
 			const file = "CHANGELOG.md";
 			const url = `https://github.com/${repo}/blob/${version}/${file}`;
 
 			expect(url).toBe(
-				"https://github.com/maloma7/bun-osv-scanner/blob/v1.0.1/CHANGELOG.md",
+				"https://github.com/yamatatsu/bun-security-scanner-snyk/blob/v1.0.1/CHANGELOG.md",
 			);
 		});
 	});
@@ -337,7 +337,7 @@ describe("Version Management", () => {
 
 		test("handles pre-release versions", () => {
 			const version = "1.0.0-alpha.1";
-			const baseVersion = version.split("-")[0]!;
+			const baseVersion = version.split("-")[0] ?? "";
 
 			expect(baseVersion).toBe("1.0.0");
 			expect(/^\d+\.\d+\.\d+$/.test(baseVersion)).toBe(true);
@@ -345,7 +345,7 @@ describe("Version Management", () => {
 
 		test("handles build metadata", () => {
 			const version = "1.0.0+build.123";
-			const baseVersion = version.split("+")[0]!;
+			const baseVersion = version.split("+")[0] ?? "";
 
 			expect(baseVersion).toBe("1.0.0");
 			expect(/^\d+\.\d+\.\d+$/.test(baseVersion)).toBe(true);
@@ -431,7 +431,7 @@ describe("Version Management", () => {
 			const version = "1.0.1";
 
 			const gitTag = `v${version}`;
-			const npmUrl = `https://www.npmjs.com/package/bun-osv-scanner/v/v${version}`;
+			const npmUrl = `https://www.npmjs.com/package/bun-security-scanner-snyk/v/v${version}`;
 			const changelogHeader = `## [${version}] - 2025-01-03`;
 			const releaseTitle = `Release v${version}`;
 

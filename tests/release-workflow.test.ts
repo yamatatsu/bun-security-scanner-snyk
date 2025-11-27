@@ -347,7 +347,7 @@ describe("Release Workflow Integration", () => {
 
 		test("validates supply chain metadata", () => {
 			const metadata = {
-				repository: "maloma7/bun-osv-scanner",
+				repository: "bun-security-scanner/snyk",
 				workflow: "Publish to npm",
 				commitSha: "abc123def456",
 			};

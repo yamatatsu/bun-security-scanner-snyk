@@ -16,11 +16,11 @@ describe("Logger", () => {
 	};
 
 	// Store original log level
-	const _originalLogLevel = process.env.OSV_LOG_LEVEL;
+	const _originalLogLevel = process.env.SNYK_LOG_LEVEL;
 
 	beforeEach(() => {
 		// Reset log level before each test
-		delete process.env.OSV_LOG_LEVEL;
+		delete process.env.SNYK_LOG_LEVEL;
 
 		// Reset console methods
 		console.debug = originalConsole.debug;
@@ -47,7 +47,7 @@ describe("Logger", () => {
 		});
 
 		test("logs all levels when log level is debug", () => {
-			process.env.OSV_LOG_LEVEL = "debug";
+			process.env.SNYK_LOG_LEVEL = "debug";
 
 			const debugSpy = spyOn(console, "debug");
 			const infoSpy = spyOn(console, "info");
@@ -66,7 +66,7 @@ describe("Logger", () => {
 		});
 
 		test("only logs warn and error when log level is warn", () => {
-			process.env.OSV_LOG_LEVEL = "warn";
+			process.env.SNYK_LOG_LEVEL = "warn";
 
 			const debugSpy = spyOn(console, "debug");
 			const infoSpy = spyOn(console, "info");
@@ -85,7 +85,7 @@ describe("Logger", () => {
 		});
 
 		test("only logs error when log level is error", () => {
-			process.env.OSV_LOG_LEVEL = "error";
+			process.env.SNYK_LOG_LEVEL = "error";
 
 			const debugSpy = spyOn(console, "debug");
 			const infoSpy = spyOn(console, "info");
@@ -114,7 +114,7 @@ describe("Logger", () => {
 			const call = spy.mock.calls[0]?.[0] as string;
 
 			expect(call).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/);
-			expect(call).toContain("OSV-INFO:");
+			expect(call).toContain("SNYK-INFO:");
 			expect(call).toContain("test message");
 		});
 
@@ -146,7 +146,7 @@ describe("Logger", () => {
 		});
 
 		test("formats different log levels correctly", () => {
-			process.env.OSV_LOG_LEVEL = "debug";
+			process.env.SNYK_LOG_LEVEL = "debug";
 
 			const debugSpy = spyOn(console, "debug");
 			const infoSpy = spyOn(console, "info");
@@ -158,16 +158,16 @@ describe("Logger", () => {
 			logger.warn("warn");
 			logger.error("error");
 
-			expect(debugSpy.mock.calls[0]?.[0]).toContain("OSV-DEBUG:");
-			expect(infoSpy.mock.calls[0]?.[0]).toContain("OSV-INFO:");
-			expect(warnSpy.mock.calls[0]?.[0]).toContain("OSV-WARN:");
-			expect(errorSpy.mock.calls[0]?.[0]).toContain("OSV-ERROR:");
+			expect(debugSpy.mock.calls[0]?.[0]).toContain("SNYK-DEBUG:");
+			expect(infoSpy.mock.calls[0]?.[0]).toContain("SNYK-INFO:");
+			expect(warnSpy.mock.calls[0]?.[0]).toContain("SNYK-WARN:");
+			expect(errorSpy.mock.calls[0]?.[0]).toContain("SNYK-ERROR:");
 		});
 	});
 
 	describe("Environment Variable Parsing", () => {
 		test("handles uppercase log level", () => {
-			process.env.OSV_LOG_LEVEL = "DEBUG";
+			process.env.SNYK_LOG_LEVEL = "DEBUG";
 
 			const spy = spyOn(console, "debug");
 			logger.debug("test");
@@ -176,7 +176,7 @@ describe("Logger", () => {
 		});
 
 		test("handles mixed case log level", () => {
-			process.env.OSV_LOG_LEVEL = "WaRn";
+			process.env.SNYK_LOG_LEVEL = "WaRn";
 
 			const infoSpy = spyOn(console, "info");
 			const warnSpy = spyOn(console, "warn");
@@ -189,7 +189,7 @@ describe("Logger", () => {
 		});
 
 		test("falls back to info for invalid log level", () => {
-			process.env.OSV_LOG_LEVEL = "invalid";
+			process.env.SNYK_LOG_LEVEL = "invalid";
 
 			const debugSpy = spyOn(console, "debug");
 			const infoSpy = spyOn(console, "info");
@@ -202,7 +202,7 @@ describe("Logger", () => {
 		});
 
 		test("falls back to info when env var is empty", () => {
-			process.env.OSV_LOG_LEVEL = "";
+			process.env.SNYK_LOG_LEVEL = "";
 
 			const debugSpy = spyOn(console, "debug");
 			const infoSpy = spyOn(console, "info");
@@ -293,21 +293,21 @@ describe("Logger", () => {
 	});
 
 	describe("Real-World Usage", () => {
-		test("logs OSV scan start", () => {
+		test("logs Snyk scan start", () => {
 			const spy = spyOn(console, "info");
 
-			logger.info("Starting OSV scan for 5 packages");
+			logger.info("Starting Snyk scan for 5 packages");
 
 			expect(spy).toHaveBeenCalled();
 			const call = spy.mock.calls[0]?.[0] as string;
 
-			expect(call).toContain("Starting OSV scan for 5 packages");
+			expect(call).toContain("Starting Snyk scan for 5 packages");
 		});
 
-		test("logs OSV scan completion with context", () => {
+		test("logs Snyk scan completion with context", () => {
 			const spy = spyOn(console, "info");
 
-			logger.info("OSV scan completed", {
+			logger.info("Snyk scan completed", {
 				packages: 10,
 				vulnerabilities: 3,
 				duration: 250,
@@ -316,7 +316,7 @@ describe("Logger", () => {
 			expect(spy).toHaveBeenCalled();
 			const call = spy.mock.calls[0]?.[0] as string;
 
-			expect(call).toContain("OSV scan completed");
+			expect(call).toContain("Snyk scan completed");
 			expect(call).toContain('"packages":10');
 			expect(call).toContain('"vulnerabilities":3');
 		});
@@ -325,7 +325,7 @@ describe("Logger", () => {
 			const spy = spyOn(console, "error");
 
 			const error = new Error("Network failure");
-			logger.error("OSV API request failed", {
+			logger.error("Snyk API request failed", {
 				error: error.message,
 				stack: error.stack,
 			});
@@ -333,12 +333,12 @@ describe("Logger", () => {
 			expect(spy).toHaveBeenCalled();
 			const call = spy.mock.calls[0]?.[0] as string;
 
-			expect(call).toContain("OSV API request failed");
+			expect(call).toContain("Snyk API request failed");
 			expect(call).toContain("Network failure");
 		});
 
 		test("logs warnings for retry attempts", () => {
-			process.env.OSV_LOG_LEVEL = "warn";
+			process.env.SNYK_LOG_LEVEL = "warn";
 
 			const spy = spyOn(console, "warn");
 
@@ -356,7 +356,7 @@ describe("Logger", () => {
 		});
 
 		test("logs debug information in verbose mode", () => {
-			process.env.OSV_LOG_LEVEL = "debug";
+			process.env.SNYK_LOG_LEVEL = "debug";
 
 			const spy = spyOn(console, "debug");
 

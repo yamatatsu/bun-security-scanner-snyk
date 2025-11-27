@@ -1,27 +1,31 @@
 /**
- * Copyright (c) 2025 maloma7. All rights reserved.
+ * Copyright (c) 2025 maloma7 (Original OSV implementation)
+ * Copyright (c) 2025 Tatsuya Yamamoto (Snyk migration)
  * SPDX-License-Identifier: MIT
  */
 
 /**
- * Centralized configuration constants for OSV Scanner
+ * Centralized configuration constants for Snyk Scanner
  * All magic numbers and configuration values consolidated here
  */
 
 import type { FatalSeverity } from "./types.js";
 
 /**
- * OSV API Configuration
+ * Snyk API Configuration
  */
-export const OSV_API = {
-	/** Base URL for OSV API */
-	BASE_URL: "https://api.osv.dev/v1",
+export const SNYK_API = {
+	/** Base URL for Snyk REST API */
+	BASE_URL: "https://api.snyk.io/rest",
+
+	/** API version to use */
+	API_VERSION: "2024-10-15",
 
 	/** Request timeout in milliseconds */
 	TIMEOUT_MS: 30_000,
 
-	/** Maximum packages per batch query */
-	MAX_BATCH_SIZE: 1_000,
+	/** Maximum packages per batch query (to be determined by testing) */
+	MAX_BATCH_SIZE: 100,
 
 	/** Maximum retry attempts for failed requests */
 	MAX_RETRY_ATTEMPTS: 2,
@@ -29,19 +33,19 @@ export const OSV_API = {
 	/** Delay between retry attempts in milliseconds */
 	RETRY_DELAY_MS: 1_000,
 
-	/** Default ecosystem for npm packages */
-	DEFAULT_ECOSYSTEM: "npm",
+	/** Rate limit: 180 requests per minute per user */
+	RATE_LIMIT_PER_MINUTE: 180,
 } as const;
 
 /**
  * HTTP Configuration
  */
 export const HTTP = {
-	/** Content type for API requests */
-	CONTENT_TYPE: "application/json",
+	/** Content type for Snyk API requests (JSON:API format) */
+	CONTENT_TYPE: "application/vnd.api+json",
 
 	/** User agent for requests */
-	USER_AGENT: "bun-osv-scanner/1.0.0",
+	USER_AGENT: "bun-snyk-scanner/1.0.0",
 } as const;
 
 /**
@@ -83,16 +87,22 @@ export const PERFORMANCE = {
  */
 export const ENV = {
 	/** Log level environment variable */
-	LOG_LEVEL: "OSV_LOG_LEVEL",
+	LOG_LEVEL: "SNYK_LOG_LEVEL",
+
+	/** Snyk API Token (required) */
+	API_TOKEN: "SNYK_API_TOKEN",
+
+	/** Snyk Organization ID (required) */
+	ORG_ID: "SNYK_ORG_ID",
 
 	/** Custom API base URL override */
-	API_BASE_URL: "OSV_API_BASE_URL",
+	API_BASE_URL: "SNYK_API_BASE_URL",
 
 	/** Custom timeout override */
-	TIMEOUT_MS: "OSV_TIMEOUT_MS",
+	TIMEOUT_MS: "SNYK_TIMEOUT_MS",
 
 	/** Disable batch queries */
-	DISABLE_BATCH: "OSV_DISABLE_BATCH",
+	DISABLE_BATCH: "SNYK_DISABLE_BATCH",
 } as const;
 
 /**

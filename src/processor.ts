@@ -3,23 +3,20 @@
  * SPDX-License-Identifier: MIT
  */
 
-import type { OSVVulnerability } from "./schema.js";
-import { isPackageAffected } from "./semver.js";
+import type { SnykVulnerability } from "./schema.js";
 import { mapSeverityToLevel } from "./severity.js";
-import { SECURITY } from "./constants.js";
 import { logger } from "./logger.js";
 
 /**
- * Process OSV vulnerabilities into Bun security advisories
+ * Process Snyk vulnerabilities into Bun security advisories
  * Handles vulnerability-to-package matching and advisory generation
  */
 export class VulnerabilityProcessor {
 	/**
-	 * Convert OSV vulnerabilities to Bun security advisories
-	 * Matches vulnerabilities against input packages and generates appropriate advisories
+	 * Convert Snyk vulnerabilities to Bun security advisories
 	 */
 	processVulnerabilities(
-		vulnerabilities: OSVVulnerability[],
+		vulnerabilities: SnykVulnerability[],
 		packages: Bun.Security.Package[],
 	): Bun.Security.Advisory[] {
 		if (vulnerabilities.length === 0 || packages.length === 0) {
@@ -31,15 +28,30 @@ export class VulnerabilityProcessor {
 		);
 
 		const advisories: Bun.Security.Advisory[] = [];
-		const processedPairs = new Set<string>(); // Track processed vuln+package pairs
 
+		// Create a package map for quick lookup
+		const packageMap = new Map<string, Bun.Security.Package>();
+		for (const pkg of packages) {
+			packageMap.set(`${pkg.name}@${pkg.version}`, pkg);
+		}
+
+		// Process each vulnerability
 		for (const vuln of vulnerabilities) {
-			const vulnAdvisories = this.processVulnerability(
-				vuln,
-				packages,
-				processedPairs,
-			);
-			advisories.push(...vulnAdvisories);
+			// Try to match vulnerability to a package
+			const matchedPackage = this.findMatchingPackage(vuln, packageMap);
+
+			if (matchedPackage) {
+				const advisory = this.createAdvisory(vuln, matchedPackage);
+				advisories.push(advisory);
+
+				logger.debug(
+					`Created advisory for ${matchedPackage.name}@${matchedPackage.version}`,
+					{
+						vulnerability: vuln.id,
+						level: advisory.level,
+					},
+				);
+			}
 		}
 
 		logger.info(`Generated ${advisories.length} security advisories`);
@@ -47,62 +59,39 @@ export class VulnerabilityProcessor {
 	}
 
 	/**
-	 * Process a single vulnerability against all packages
+	 * Find the package that matches this vulnerability
+	 * Uses package name and version from vulnerability data
 	 */
-	private processVulnerability(
-		vuln: OSVVulnerability,
-		packages: Bun.Security.Package[],
-		processedPairs: Set<string>,
-	): Bun.Security.Advisory[] {
-		const advisories: Bun.Security.Advisory[] = [];
-
-		if (!vuln.affected) {
-			logger.debug(`Vulnerability ${vuln.id} has no affected packages`);
-			return advisories;
+	private findMatchingPackage(
+		vuln: SnykVulnerability,
+		packageMap: Map<string, Bun.Security.Package>,
+	): Bun.Security.Package | null {
+		// If vulnerability has package info, use it for matching
+		if (vuln.packageName && vuln.packageVersion) {
+			const key = `${vuln.packageName}@${vuln.packageVersion}`;
+			return packageMap.get(key) || null;
 		}
 
-		for (const affected of vuln.affected) {
-			for (const pkg of packages) {
-				const pairKey = `${vuln.id}:${pkg.name}@${pkg.version}`;
-
-				// Avoid duplicate advisories for same vulnerability+package
-				if (processedPairs.has(pairKey)) {
-					continue;
-				}
-
-				if (isPackageAffected(pkg, affected)) {
-					const advisory = this.createAdvisory(vuln, pkg);
-					advisories.push(advisory);
-					processedPairs.add(pairKey);
-
-					logger.debug(`Created advisory for ${pkg.name}@${pkg.version}`, {
-						vulnerability: vuln.id,
-						level: advisory.level,
-					});
-
-					// Only create one advisory per package per vulnerability
-					break;
-				}
-			}
-		}
-
-		return advisories;
+		// Fallback: return first package (this shouldn't happen with Snyk API)
+		// as each vulnerability should be associated with a specific package
+		return packageMap.values().next().value || null;
 	}
 
 	/**
-	 * Create a Bun security advisory from an OSV vulnerability and affected package
+	 * Create a Bun security advisory from a Snyk vulnerability
 	 */
 	private createAdvisory(
-		vuln: OSVVulnerability,
+		vuln: SnykVulnerability,
 		pkg: Bun.Security.Package,
 	): Bun.Security.Advisory {
 		const level = mapSeverityToLevel(vuln);
-		const url = this.getVulnerabilityUrl(vuln);
+		const message = vuln.title || vuln.id;
+		const url = vuln.url || null;
 		const description = this.getVulnerabilityDescription(vuln);
 
 		return {
 			id: vuln.id,
-			message: vuln.summary || vuln.details || vuln.id,
+			message,
 			level,
 			package: pkg.name,
 			url,
@@ -111,70 +100,31 @@ export class VulnerabilityProcessor {
 	}
 
 	/**
-	 * Get the best URL to reference for this vulnerability
-	 * Prioritizes official references and known vulnerability databases
-	 */
-	private getVulnerabilityUrl(vuln: OSVVulnerability): string | null {
-		if (!vuln.references || vuln.references.length === 0) {
-			return null;
-		}
-
-		// Prioritize official advisory URLs
-		const advisoryRef = vuln.references.find(
-			(ref) =>
-				ref.type === "ADVISORY" || ref.url.includes("github.com/advisories"),
-		);
-		if (advisoryRef) {
-			return advisoryRef.url;
-		}
-
-		// Then CVE URLs
-		const cveRef = vuln.references.find((ref) => {
-			try {
-				const url = new URL(ref.url);
-				return (
-					url.hostname === "cve.mitre.org" || url.hostname === "nvd.nist.gov"
-				);
-			} catch {
-				return false;
-			}
-		});
-		if (cveRef) {
-			return cveRef.url;
-		}
-
-		// Fall back to first reference
-		return vuln.references[0]?.url || null;
-	}
-
-	/**
 	 * Get a descriptive summary of the vulnerability
-	 * Uses summary, details, or fallback description
 	 */
-	private getVulnerabilityDescription(vuln: OSVVulnerability): string | null {
-		// Prefer concise summary
-		if (vuln.summary?.trim()) {
-			return vuln.summary.trim();
+	private getVulnerabilityDescription(vuln: SnykVulnerability): string | null {
+		if (vuln.description?.trim()) {
+			const desc = vuln.description.trim();
+
+			// Truncate if too long
+			if (desc.length > 200) {
+				// Try to get first sentence
+				const firstSentence = desc.match(/^[^.!?]*[.!?]/)?.[0];
+				if (firstSentence && firstSentence.length <= 200) {
+					return firstSentence;
+				}
+				// Truncate to 200 chars
+				return `${desc.substring(0, 197)}...`;
+			}
+
+			return desc;
 		}
 
-		// Fall back to details (truncated if too long)
-		if (vuln.details?.trim()) {
-			const details = vuln.details.trim();
-			if (details.length <= SECURITY.MAX_DESCRIPTION_LENGTH) {
-				return details;
-			}
-			// Truncate long details to first sentence or max length
-			const firstSentence = details.match(/^[^.!?]*[.!?]/)?.[0];
-			if (
-				firstSentence &&
-				firstSentence.length <= SECURITY.MAX_DESCRIPTION_LENGTH
-			) {
-				return firstSentence;
-			}
-			return `${details.substring(0, SECURITY.MAX_DESCRIPTION_LENGTH - 3)}...`;
+		// Fallback to title
+		if (vuln.title?.trim()) {
+			return vuln.title.trim();
 		}
 
-		// No description available
 		return null;
 	}
 }

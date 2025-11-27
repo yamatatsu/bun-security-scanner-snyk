@@ -1,288 +1,424 @@
 <!--
-Copyright (c) 2025 maloma7. All rights reserved.
+Copyright (c) 2025 maloma7 (Original OSV implementation)
+Copyright (c) 2025 Tatsuya Yamamoto (Snyk migration)
 SPDX-License-Identifier: MIT
 -->
 
-<img src="docs/icons/logo.svg" width="100%" alt="Bun OSV Scanner" />
+# Bun Security Scanner with Snyk
 
-# Bun OSV Scanner
+A production-grade security scanner for [Bun](https://bun.sh/) that integrates with [Snyk](https://snyk.io/) to detect known vulnerabilities in npm packages during installation. Specifically designed to protect against supply chain attacks like the Shai-Hulud worm.
 
-A production-grade security scanner for [Bun](https://bun.sh/) that integrates with [OSV.dev](https://osv.dev/) (Open Source Vulnerabilities) to detect known vulnerabilities in npm packages during installation.
+[![License: MIT](https://img.shields.io/badge/License-MIT-471694)](LICENSE)
+[![Built with Claude](https://img.shields.io/badge/Built_with-Claude-471694?style=flat&logo=claude&logoColor=471694)](https://anthropic.com/claude-code)
+[![Checked with Biome](https://img.shields.io/badge/Checked_with-Biome-471694?style=flat&logo=biome&logoColor=471694)](https://biomejs.dev)
+[![Secured with Lefthook](https://img.shields.io/badge/Secured_with-Lefthook-471694?style=flat&logo=lefthook&logoColor=471694)](https://lefthook.dev/)
 
-[![npm version](https://img.shields.io/npm/v/@bun-security-scanner/osv?color=dc2626)](https://npmjs.com/package/@bun-security-scanner/osv)
-[![npm downloads](https://img.shields.io/npm/dm/@bun-security-scanner/osv?color=dc2626)](https://npmjs.com/package/@bun-security-scanner/osv)
-[![License: MIT](https://img.shields.io/badge/License-MIT-dc2626)](LICENSE)
-[![Built with Claude](https://img.shields.io/badge/Built_with-Claude-dc2626?style=flat&logo=claude&logoColor=dc2626)](https://anthropic.com/claude-code)
-[![Checked with Biome](https://img.shields.io/badge/Checked_with-Biome-dc2626?style=flat&logo=biome&logoColor=dc2626)](https://biomejs.dev)
-[![Secured with Lefthook](https://img.shields.io/badge/Secured_with-Lefthook-dc2626?style=flat&logo=lefthook&logoColor=dc2626)](https://lefthook.dev/)
+## ⚠️ Requirements
 
-## What is OSV.dev?
+**This scanner requires a Snyk Enterprise plan.**
 
-[OSV.dev](https://osv.dev/) is Google's open source vulnerability database that aggregates and distributes vulnerability information for open source projects. It provides:
+- Snyk API Token with appropriate permissions
+- Snyk Organization ID
+- Active Snyk **Enterprise** subscription
 
-- **Comprehensive Coverage**: Vulnerabilities from multiple sources (npm, PyPI, Go, Rust, etc.)
-- **Structured Data**: Machine-readable vulnerability information with precise version ranges
-- **Real-time Updates**: Continuously updated with the latest security advisories
-- **Authoritative Source**: Maintained by Google and the open source community
+> **Note:** The Snyk REST API endpoint used by this scanner (`POST /rest/orgs/{org_id}/packages/issues`) is only available on Snyk Enterprise plans.
+>
+> **Don't have an Enterprise plan?**
+> Use [@bun-security-scanner/osv](https://www.npmjs.com/package/@bun-security-scanner/osv) instead - it's free and works for everyone!
+
+## What is Snyk?
+
+[Snyk](https://snyk.io/) is a developer security platform that helps find and fix vulnerabilities in open source dependencies, container images, and infrastructure as code. This scanner integrates with Snyk's REST API to provide:
+
+- **Comprehensive Vulnerability Database**: Curated vulnerability data from multiple sources
+- **Accurate Package Intelligence**: Detailed vulnerability information for npm packages
+- **Real-time Protection**: Latest security advisories and patches
+- **Enterprise-Grade Security**: Trusted by thousands of organizations worldwide
+
+## Why Snyk Scanner?
+
+### Protection Against Supply Chain Attacks
+
+The primary goal of this scanner is to **protect against self-replicating malware** like the Shai-Hulud worm, which:
+
+- Steals npm tokens and GitHub Personal Access Tokens
+- Self-replicates by publishing infected versions of packages
+- Executes malicious code via preinstall/postinstall scripts
+- Spreads through both direct and transitive dependencies
+
+**This scanner checks ALL packages (including transitive dependencies) BEFORE any install scripts execute.**
 
 ## Features
 
-- **Real-time Scanning**: Checks packages against OSV.dev during installation
+- **Real-time Scanning**: Checks packages against Snyk API during installation
+- **Supply Chain Protection**: Scans both direct and transitive dependencies
 - **High Performance**: Efficient batch queries with smart deduplication
 - **Fail-safe**: Never blocks installations due to scanner errors
 - **Structured Logging**: Configurable logging levels with contextual information
 - **Precise Matching**: Accurate vulnerability-to-package version matching
+- **Rate Limit Handling**: Automatic retry with exponential backoff
 - **Configurable**: Environment variable configuration for all settings
-- **Well Tested**: Comprehensive test suite with edge case coverage
 
 ## Installation
 
-**No API keys or registration required** - completely free to use with zero setup beyond installation.
+### Prerequisites
+
+1. **Create a Snyk account**: [https://snyk.io/signup](https://snyk.io/signup)
+2. **Get your API token**: [https://docs.snyk.io/snyk-api/authentication-for-api](https://docs.snyk.io/snyk-api/authentication-for-api)
+3. **Find your Organization ID**: [https://docs.snyk.io/snyk-admin/manage-groups-and-organizations/organizations/organization-general-settings](https://docs.snyk.io/snyk-admin/manage-groups-and-organizations/organizations/organization-general-settings)
+
+### Install the Scanner
 
 ```bash
 # Install as a dev dependency
-bun add -d @bun-security-scanner/osv
+bun add -d bun-security-scanner-snyk
 ```
 
 ## Configuration
 
-### 1. Enable the Scanner
+### 1. Set Environment Variables
+
+**Required:**
+
+```bash
+# Your Snyk API token
+export SNYK_API_TOKEN="your-api-token-here"
+
+# Your Snyk organization ID
+export SNYK_ORG_ID="your-org-id-here"
+```
+
+**Optional:**
+
+```bash
+# Logging level (debug, info, warn, error)
+export SNYK_LOG_LEVEL=info
+
+# Custom Snyk API base URL (optional)
+export SNYK_API_BASE_URL=https://api.snyk.io/rest
+
+# Request timeout in milliseconds (default: 30000)
+export SNYK_TIMEOUT_MS=30000
+
+# Disable batch queries (default: false)
+export SNYK_DISABLE_BATCH=false
+```
+
+### 2. Enable the Scanner
 
 Add to your `bunfig.toml`:
 
 ```toml
 [install.security]
-scanner = "@bun-security-scanner/osv"
+scanner = "bun-security-scanner-snyk"
 ```
 
-### 2. Optional: Configuration Options
+### 3. Secure Your Credentials
 
-The scanner can be configured via environment variables:
+**Never commit API tokens to version control!**
+
+Add to your `.env` file:
 
 ```bash
-# Logging level (debug, info, warn, error)
-export OSV_LOG_LEVEL=info
+# .env
+SNYK_API_TOKEN=your-api-token-here
+SNYK_ORG_ID=your-org-id-here
+```
 
-# Custom OSV API base URL (optional)
-export OSV_API_BASE_URL=https://api.osv.dev/v1
+Add `.env` to your `.gitignore`:
 
-# Request timeout in milliseconds (default: 30000)
-export OSV_TIMEOUT_MS=30000
-
-# Disable batch queries (default: false)
-export OSV_DISABLE_BATCH=false
+```
+# .gitignore
+.env
 ```
 
 ## How It Works
 
 ### Security Scanning Process
 
-1. **Package Detection**: Bun provides package information during installation
+1. **Package Detection**: Bun provides ALL packages (including transitive deps) before installation
 2. **Smart Deduplication**: Eliminates duplicate package@version queries
-3. **Batch Querying**: Uses OSV.dev's efficient `/querybatch` endpoint
-4. **Vulnerability Matching**: Precisely matches vulnerabilities to installed versions
-5. **Severity Assessment**: Analyzes CVSS scores and database-specific severity
-6. **Advisory Generation**: Creates actionable security advisories
+3. **PURL Conversion**: Converts packages to PURL format (`pkg:npm/package@version`)
+4. **Batch Querying**: Uses Snyk REST API's `/orgs/{org_id}/packages/issues` endpoint
+5. **Vulnerability Matching**: Matches vulnerabilities to installed versions
+6. **Severity Assessment**: Analyzes Snyk severity levels and CVSS scores
+7. **Advisory Generation**: Creates actionable security advisories
+8. **Installation Control**: Blocks or warns based on severity
 
 ### Advisory Levels
 
 The scanner generates two types of security advisories:
 
 #### Fatal (Installation Blocked)
-- **CVSS Score**: ≥ 7.0 (High/Critical)
-- **Database Severity**: CRITICAL or HIGH
+- **Snyk Severity**: CRITICAL or HIGH
+- **CVSS Score**: ≥ 7.0 (if available)
 - **Action**: Installation is immediately blocked
-- **Examples**: Remote code execution, privilege escalation, data exposure
+- **Examples**: Remote code execution, privilege escalation, supply chain attacks
 
 #### Warning (User Prompted)
-- **CVSS Score**: < 7.0 (Medium/Low)
-- **Database Severity**: MEDIUM, LOW, or unspecified
+- **Snyk Severity**: MEDIUM or LOW
+- **CVSS Score**: < 7.0
 - **Action**: User is prompted to continue or cancel
-- **TTY**: Interactive choice presented
-- **Non-TTY**: Installation automatically cancelled
-- **Examples**: Denial of service, information disclosure, deprecation warnings
+- **Examples**: Denial of service, information disclosure
 
-### Error Handling Philosophy
+## Usage
 
-The scanner follows a **fail-safe** approach:
-- Network errors don't block installations
-- Malformed responses are logged but don't halt the process
-- Scanner crashes return empty advisory arrays (allows installation)
-- Only genuine security threats should prevent package installation
+### Automatic Scanning
 
-## Usage Examples
-
-### Basic Usage
+Once configured, the scanner runs automatically during:
 
 ```bash
-# Scanner runs automatically during installation
-bun install express
-# -> Checks express and all dependencies for vulnerabilities
-
-bun add lodash@4.17.20
-# -> May warn about known lodash vulnerabilities in older versions
-```
-
-### Development Usage
-
-```bash
-# Enable debug logging to see detailed scanning information
-OSV_LOG_LEVEL=debug bun install
-
-# Test with a known vulnerable package
-bun add event-stream@3.3.6
-# -> Should trigger security advisory
-```
-
-### Configuration Examples
-
-```bash
-# Increase timeout for slow networks
-OSV_TIMEOUT_MS=60000 bun install
-
-# Use custom OSV instance (advanced)
-OSV_API_BASE_URL=https://api.custom-osv.dev/v1 bun install
-```
-
-## Architecture
-
-The scanner is built with a modular, production-ready architecture:
-
-```
-src/
-├── index.ts              # Main scanner implementation
-├── client.ts             # OSV.dev API client with batch support
-├── processor.ts          # Vulnerability processing and advisory generation
-├── cli.ts                # CLI interface for testing
-├── schema.ts             # Zod schemas for OSV API responses
-├── constants.ts          # Centralized configuration management
-├── logger.ts             # Structured logging with configurable levels
-├── retry.ts              # Robust retry logic with exponential backoff
-├── semver.ts             # OSV semver range matching
-├── severity.ts           # CVSS and severity assessment
-└── types.ts              # TypeScript type definitions
-```
-
-### Key Design Principles
-
-1. **Separation of Concerns**: Each module has a single, well-defined responsibility
-2. **Error Isolation**: Failures in one component don't cascade to others
-3. **Performance Optimization**: Batch processing, deduplication, and concurrent requests
-4. **Observability**: Comprehensive logging for debugging and monitoring
-5. **Type Safety**: Full TypeScript coverage with runtime validation
-
-## Testing
-
-```bash
-# Run the test suite
-bun test
-
-# Run with coverage
-bun test --coverage
-
-# Type checking
-bun run typecheck
-
-# Linting
-bun run lint
-```
-
-### Test Coverage
-
-- Known vulnerable packages detection
-- Safe package verification  
-- Multiple package scenarios
-- Version-specific vulnerability matching
-- Network failure handling
-- Edge cases and error conditions
-
-## Development
-
-### Building from Source
-
-```bash
-git clone https://github.com/bun-security-scanner/osv.git
-cd osv
 bun install
-bun run build
+bun add package-name
+bun update
 ```
 
-### Contributing
+### Manual Testing (CLI)
 
-We do not accept pull requests as this package is actively maintained. However, we appreciate if developers report bugs or suggest features by [opening an issue](https://github.com/bun-security-scanner/osv/issues/new).
+Test specific packages:
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+```bash
+# Test a single package
+bun run src/cli.ts test lodash@4.17.20
 
-## API Reference
+# Test multiple packages
+bun run src/cli.ts test express@4.18.0 axios@1.5.0
 
-### OSV.dev Integration
+# Scan from package.json
+bun run src/cli.ts scan ./package.json
+```
 
-This scanner integrates with the following OSV.dev endpoints:
+## Example Output
 
-- **POST /v1/querybatch**: Batch vulnerability queries for multiple packages
-- **POST /v1/query**: Individual package queries with pagination support
+### Clean Installation
 
-For complete OSV.dev API documentation, visit: https://google.github.io/osv.dev/api/
+```bash
+$ bun install
+[2025-01-27T10:00:00.000Z] SNYK-INFO: Starting Snyk scan for 150 packages
+[2025-01-27T10:00:00.500Z] SNYK-INFO: Scanning 150 unique packages (150 total)
+[2025-01-27T10:00:02.000Z] SNYK-INFO: Found 0 vulnerabilities
+[2025-01-27T10:00:02.001Z] SNYK-INFO: Snyk scan completed: 0 advisories found for 150 packages
+```
 
-### Configuration Reference
+### Vulnerability Detected
 
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `OSV_LOG_LEVEL` | `info` | Logging level: debug, info, warn, error |
-| `OSV_API_BASE_URL` | `https://api.osv.dev/v1` | OSV API base URL |
-| `OSV_TIMEOUT_MS` | `30000` | Request timeout in milliseconds |
-| `OSV_DISABLE_BATCH` | `false` | Disable batch queries (use individual queries) |
+```bash
+$ bun add event-stream@3.3.6
+[2025-01-27T10:00:00.000Z] SNYK-INFO: Starting Snyk scan for 1 packages
+🔴 FATAL: event-stream@3.3.6
+   Description: Malicious package - contains code that steals credentials
+   Severity: CRITICAL
+   URL: https://security.snyk.io/vuln/SNYK-JS-EVENTSTREAM-...
+
+⚠️  Installation blocked due to critical security vulnerability
+```
 
 ## Troubleshooting
 
-### Common Issues
+### Error: Snyk API credentials not configured
 
-**Scanner not running during installation?**
-- Verify `bunfig.toml` configuration
-- Check that the package is installed as a dev dependency
-- Enable debug logging: `OSV_LOG_LEVEL=debug bun install`
+**Cause**: Missing `SNYK_API_TOKEN` or `SNYK_ORG_ID` environment variables.
 
-**Network timeouts?**
-- Increase timeout: `OSV_TIMEOUT_MS=60000`
-- Check internet connectivity to osv.dev
-- Consider corporate firewall restrictions
+**Solution**:
+1. Verify environment variables are set: `echo $SNYK_API_TOKEN`
+2. Check your shell profile (`.bashrc`, `.zshrc`, etc.)
+3. If using `.env` file, ensure it's loaded
 
-**Too many false positives?**
-- OSV.dev data is authoritative - verify vulnerabilities manually
-- Check if you're using an outdated package version
-- Report false positives to the OSV.dev project
+### Error: Rate limit exceeded
 
-### Debug Mode
+**Cause**: Exceeded Snyk API rate limit (180 requests/minute).
 
-Enable comprehensive debug output:
+**Solution**:
+- Wait for the rate limit to reset (typically 1 minute)
+- Reduce the number of packages being scanned
+- The scanner will automatically retry with exponential backoff
+
+### Error: Snyk API returned 401
+
+**Cause**: Invalid or expired API token.
+
+**Solution**:
+1. Generate a new API token: [https://docs.snyk.io/snyk-api/authentication-for-api](https://docs.snyk.io/snyk-api/authentication-for-api)
+2. Update your `SNYK_API_TOKEN` environment variable
+
+### Error: Snyk API returned 404
+
+**Cause**: Invalid Organization ID or endpoint not available.
+
+**Solution**:
+1. Verify your Organization ID: [https://app.snyk.io/](https://app.snyk.io/)
+2. Ensure your Snyk plan supports the REST API
+3. Contact Snyk support if the issue persists
+
+### Error: Organization is not allowed to perform this action (403 Forbidden)
+
+**Cause**: Your Snyk plan does not have access to the REST API endpoint used by this scanner. This scanner requires a **Snyk Enterprise plan**.
+
+**Error Code**: `SNYK-OSSI-1040`
+
+**Solution**:
+
+This scanner uses the Snyk REST API endpoint `POST /rest/orgs/{org_id}/packages/issues`, which is only available on **Snyk Enterprise plans**.
+
+**Don't have an Enterprise plan?** Switch to the free alternative:
 
 ```bash
-OSV_LOG_LEVEL=debug bun install your-package
+# Remove this scanner
+bun remove bun-security-scanner-snyk
+
+# Install the OSV-based scanner (free, no account required)
+bun add -d @bun-security-scanner/osv
 ```
 
-This shows:
-- Package deduplication statistics
-- API request/response details  
-- Vulnerability matching decisions
-- Performance timing information
+Update your `bunfig.toml`:
+```toml
+[install.security]
+scanner = "@bun-security-scanner/osv"
+```
+
+The OSV scanner is free, requires no API credentials, and works for everyone. Learn more: [@bun-security-scanner/osv](https://www.npmjs.com/package/@bun-security-scanner/osv)
+
+### Scanner Not Running
+
+**Check Configuration**:
+```bash
+# Verify bunfig.toml
+cat bunfig.toml
+
+# Should contain:
+# [install.security]
+# scanner = "bun-security-scanner-snyk"
+```
+
+### Enable Debug Logging
+
+```bash
+export SNYK_LOG_LEVEL=debug
+bun install
+```
+
+## API Rate Limits
+
+Snyk REST API has the following rate limits:
+
+- **Rate Limit**: 180 requests per minute per user
+- **Batch Size**: 100 packages per request (configurable)
+- **Retry Strategy**: Automatic exponential backoff with `Retry-After` header support
+
+The scanner automatically handles rate limits with intelligent batching and retry logic.
+
+## Security Considerations
+
+### API Token Security
+
+- **Never commit tokens**: Use `.env` files and add to `.gitignore`
+- **Rotate tokens regularly**: Generate new tokens periodically
+- **Use organization tokens**: Avoid using personal API tokens in CI/CD
+- **Restrict permissions**: Use tokens with minimal required permissions
+
+### Scanner Fail-Safe
+
+The scanner is designed with a fail-safe approach:
+
+- **Never blocks on errors**: Scanner failures don't prevent installation
+- **Logs all errors**: All failures are logged for debugging
+- **Continues on partial failure**: If one batch fails, others continue
+- **Graceful degradation**: Handles API outages without breaking installs
+
+## Development
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) >= 1.0.0
+- Snyk API Token (for testing)
+- Snyk Organization ID (for testing)
+
+### Setup
+
+```bash
+# Clone repository
+git clone https://github.com/your-org/bun-security-scanner-snyk
+cd bun-security-scanner-snyk
+
+# Install dependencies
+bun install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your Snyk credentials
+
+# Run tests (unit tests don't require API token)
+bun test tests/purl.test.ts
+bun test tests/severity.test.ts
+
+# Run integration tests (requires API token)
+export SNYK_API_TOKEN="your-token"
+export SNYK_ORG_ID="your-org-id"
+bun test tests/scanner.test.ts
+```
+
+### Project Structure
+
+```
+src/
+├── index.ts        # Main scanner entry point
+├── client.ts       # Snyk API client
+├── schema.ts       # Zod schemas for API responses
+├── processor.ts    # Vulnerability processing logic
+├── severity.ts     # Severity assessment logic
+├── purl.ts         # PURL conversion utilities
+├── logger.ts       # Structured logging
+├── constants.ts    # Configuration constants
+├── retry.ts        # Retry logic with exponential backoff
+└── cli.ts          # CLI interface for testing
+
+tests/
+├── purl.test.ts    # PURL conversion tests
+├── severity.test.ts # Severity mapping tests
+└── ...             # Other test files
+```
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Run linter: `bun run lint`
+6. Run tests: `bun test`
+7. Submit a pull request
 
 ## License
 
-MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- **OSV.dev Team**: For maintaining the comprehensive vulnerability database
-- **Bun Team**: For the innovative Security Scanner API
+- [Bun](https://bun.sh/) - Fast all-in-one JavaScript runtime
+- [Snyk](https://snyk.io/) - Developer security platform
+- [Zod](https://zod.dev/) - TypeScript-first schema validation
+- Built with [Claude Code](https://anthropic.com/claude-code)
 
 ## Related Projects
 
-- [Bun Security Scanner API](https://bun.com/docs/install/security-scanner-api)
-- [OSV.dev](https://osv.dev/) - Open Source Vulnerabilities database
+- [@bun-security-scanner/osv](https://npmjs.com/package/@bun-security-scanner/osv) - OSV.dev-based scanner (free alternative)
+
+## Credits
+
+This project is a fork and migration of [bun-osv-scanner](https://github.com/maloma7/bun-osv-scanner) by [maloma7](https://github.com/maloma7). The original project provided OSV.dev-based vulnerability scanning, and this version has been migrated to use the Snyk API while maintaining the same core functionality.
+
+We are grateful for maloma7's original work, which laid the foundation for this scanner.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/your-org/bun-security-scanner-snyk/issues)
+- **Snyk Support**: [Snyk Support Portal](https://support.snyk.io/)
+- **Bun Discord**: [https://bun.sh/discord](https://bun.sh/discord)
 
 ---
 
-**Last Updated**: November 6, 2025
-**Version**: 1.0.0
-
-*This documentation is a living document and will be updated as the project evolves and new features are added.*
+**⚠️ Important**: This scanner is designed to detect known vulnerabilities. It should be used as part of a comprehensive security strategy, not as the sole security measure.

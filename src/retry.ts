@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { OSV_API } from "./constants.js";
+import { SNYK_API } from "./constants.js";
 import { logger } from "./logger.js";
 
 /**
@@ -19,9 +19,13 @@ export interface RetryConfig {
  * Default retry configuration
  */
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-	maxAttempts: OSV_API.MAX_RETRY_ATTEMPTS + 1,
-	delayMs: OSV_API.RETRY_DELAY_MS,
+	maxAttempts: SNYK_API.MAX_RETRY_ATTEMPTS + 1,
+	delayMs: SNYK_API.RETRY_DELAY_MS,
 	shouldRetry: (error: Error) => {
+		// Don't retry on permission errors (SnykPermissionError)
+		if (error.name === "SnykPermissionError") {
+			return false;
+		}
 		// Don't retry on 4xx client errors (except rate limiting)
 		if (
 			error.message.includes("400") ||

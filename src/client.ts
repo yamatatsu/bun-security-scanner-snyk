@@ -1,40 +1,67 @@
 /**
- * Copyright (c) 2025 maloma7. All rights reserved.
+ * Copyright (c) 2025 maloma7 (Original OSV implementation)
+ * Copyright (c) 2025 Tatsuya Yamamoto (Snyk migration)
  * SPDX-License-Identifier: MIT
  */
 
-import type { OSVQuery, OSVVulnerability } from "./schema.js";
-import {
-	OSVResponseSchema,
-	OSVBatchResponseSchema,
-	OSVVulnerabilitySchema,
+import type {
+	SnykVulnerability,
+	SnykIssuesRequest,
+	SnykIssuesResponse,
+	PURL,
 } from "./schema.js";
-import { OSV_API, HTTP, PERFORMANCE, getConfig, ENV } from "./constants.js";
+import { SnykIssuesResponseSchema, SnykErrorSchema } from "./schema.js";
+import { SNYK_API, HTTP, ENV, getConfig } from "./constants.js";
 import { withRetry } from "./retry.js";
 import { logger } from "./logger.js";
+import { packagesToPURLs } from "./purl.js";
 
 /**
- * OSV API Client
- * Handles all communication with OSV.dev API including batch queries and individual lookups
+ * Error thrown when Snyk API returns 403 Forbidden
+ * This indicates insufficient permissions or plan limitations
  */
-export class OSVClient {
+export class SnykPermissionError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "SnykPermissionError";
+	}
+}
+
+/**
+ * Snyk API Client
+ * Handles all communication with Snyk REST API including batch queries
+ */
+export class SnykClient {
 	private readonly baseUrl: string;
+	private readonly orgId: string;
+	private readonly apiToken: string;
 	private readonly timeout: number;
-	private readonly useBatch: boolean;
+	private readonly apiVersion: string;
 
 	constructor() {
-		this.baseUrl = getConfig(ENV.API_BASE_URL, OSV_API.BASE_URL);
-		this.timeout = getConfig(ENV.TIMEOUT_MS, OSV_API.TIMEOUT_MS);
-		this.useBatch = !getConfig(ENV.DISABLE_BATCH, false);
+		this.baseUrl = getConfig(ENV.API_BASE_URL, SNYK_API.BASE_URL);
+		this.timeout = getConfig(ENV.TIMEOUT_MS, SNYK_API.TIMEOUT_MS);
+		this.apiVersion = SNYK_API.API_VERSION;
+
+		// Get required credentials from environment
+		const orgId = Bun.env[ENV.ORG_ID];
+		const apiToken = Bun.env[ENV.API_TOKEN];
+
+		if (!orgId || !apiToken) {
+			throw new Error("SNYK_ORG_ID and SNYK_API_TOKEN must be set");
+		}
+
+		this.orgId = orgId;
+		this.apiToken = apiToken;
 	}
 
 	/**
 	 * Query vulnerabilities for multiple packages
-	 * Uses batch API when possible for better performance
+	 * Uses Snyk REST API with PURL format
 	 */
 	async queryVulnerabilities(
 		packages: Bun.Security.Package[],
-	): Promise<OSVVulnerability[]> {
+	): Promise<SnykVulnerability[]> {
 		if (packages.length === 0) {
 			return [];
 		}
@@ -45,20 +72,23 @@ export class OSVClient {
 			`Scanning ${uniquePackages.length} unique packages (${packages.length} total)`,
 		);
 
-		// Create OSV queries
-		const queries = uniquePackages.map((pkg) => ({
-			package: {
-				name: pkg.name,
-				ecosystem: OSV_API.DEFAULT_ECOSYSTEM,
-			},
-			version: pkg.version,
-		}));
+		// Convert packages to PURLs
+		const purls = packagesToPURLs(uniquePackages);
 
-		if (this.useBatch && queries.length > 1) {
-			return await this.queryWithBatch(queries);
-		} else {
-			return await this.queryIndividually(queries);
-		}
+		// Create package map for later reference
+		const packageMap = this.createPackageMap(uniquePackages);
+
+		// Query Snyk API in batches
+		const allIssues = await this.queryInBatches(purls);
+
+		// Convert Snyk issues to our internal vulnerability format
+		const vulnerabilities = this.convertIssuesToVulnerabilities(
+			allIssues,
+			packageMap,
+		);
+
+		logger.info(`Found ${vulnerabilities.length} vulnerabilities`);
+		return vulnerabilities;
 	}
 
 	/**
@@ -88,23 +118,41 @@ export class OSVClient {
 	}
 
 	/**
-	 * Use batch API for efficient querying
-	 * Follows OSV.dev recommended pattern: batch query → individual details
+	 * Create a map of package name@version to package for quick lookup
 	 */
-	private async queryWithBatch(
-		queries: OSVQuery[],
-	): Promise<OSVVulnerability[]> {
-		const vulnerabilityIds: string[] = [];
+	private createPackageMap(
+		packages: Bun.Security.Package[],
+	): Map<string, Bun.Security.Package> {
+		const map = new Map<string, Bun.Security.Package>();
+		for (const pkg of packages) {
+			map.set(`${pkg.name}@${pkg.version}`, pkg);
+		}
+		return map;
+	}
 
-		// Process queries in batches
-		for (let i = 0; i < queries.length; i += OSV_API.MAX_BATCH_SIZE) {
-			const batchQueries = queries.slice(i, i + OSV_API.MAX_BATCH_SIZE);
+	/**
+	 * Query Snyk API in batches
+	 */
+	private async queryInBatches(
+		purls: PURL[],
+	): Promise<SnykIssuesResponse["data"]> {
+		const allIssues: SnykIssuesResponse["data"] = [];
+
+		// Process PURLs in batches
+		for (let i = 0; i < purls.length; i += SNYK_API.MAX_BATCH_SIZE) {
+			const batchPurls = purls.slice(i, i + SNYK_API.MAX_BATCH_SIZE);
 
 			try {
-				const batchIds = await this.executeBatchQuery(batchQueries);
-				vulnerabilityIds.push(...batchIds);
+				const issues = await this.executeBatchQuery(batchPurls);
+				allIssues.push(...issues);
 			} catch (error) {
-				logger.error(`Batch query failed for ${batchQueries.length} packages`, {
+				// Re-throw permission errors immediately - these should stop installation
+				if (error instanceof SnykPermissionError) {
+					throw error;
+				}
+
+				// Log and continue for other errors (network issues, etc.)
+				logger.error(`Batch query failed for ${batchPurls.length} packages`, {
 					error: error instanceof Error ? error.message : String(error),
 					startIndex: i,
 				});
@@ -112,202 +160,140 @@ export class OSVClient {
 			}
 		}
 
-		// Fetch detailed vulnerability information
-		return await this.fetchVulnerabilityDetails(vulnerabilityIds);
+		return allIssues;
 	}
 
 	/**
-	 * Execute a single batch query
+	 * Execute a single batch query to Snyk API
 	 */
-	private async executeBatchQuery(queries: OSVQuery[]): Promise<string[]> {
-		const vulnerabilityIds: string[] = [];
+	private async executeBatchQuery(
+		purls: PURL[],
+	): Promise<SnykIssuesResponse["data"]> {
+		logger.debug(`Querying Snyk API for ${purls.length} packages`);
+
+		// Construct request body
+		const requestBody: SnykIssuesRequest = {
+			data: {
+				attributes: {
+					purls,
+				},
+				type: "resource",
+			},
+		};
+
+		const url = `${this.baseUrl}/orgs/${this.orgId}/packages/issues?version=${this.apiVersion}`;
 
 		const response = await withRetry(async () => {
-			const res = await fetch(`${this.baseUrl}/querybatch`, {
+			const res = await fetch(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": HTTP.CONTENT_TYPE,
-					"User-Agent": HTTP.USER_AGENT,
+					Authorization: `token ${this.apiToken}`,
 				},
-				body: JSON.stringify({ queries }),
+				body: JSON.stringify(requestBody),
 				signal: AbortSignal.timeout(this.timeout),
 			});
 
+			// Handle different status codes
+			if (res.status === 403) {
+				// Permission denied - likely due to plan limitations
+				let errorMessage =
+					"Organization is not allowed to perform this action.";
+				let errorCode = "SNYK-OSSI-1040";
+
+				try {
+					const errorData = await res.json();
+					const parsedError = SnykErrorSchema.safeParse(errorData);
+					if (parsedError.success && parsedError.data.errors.length > 0) {
+						const firstError = parsedError.data.errors[0];
+						if (firstError) {
+							errorMessage = firstError.detail || errorMessage;
+							errorCode = firstError.code || errorCode;
+						}
+					}
+				} catch {
+					// Use default error message
+				}
+
+				throw new SnykPermissionError(errorMessage);
+			}
+
+			if (res.status === 429) {
+				// Rate limit exceeded
+				const retryAfter = res.headers.get("Retry-After");
+				const message = retryAfter
+					? `Rate limit exceeded. Retry after ${retryAfter} seconds.`
+					: "Rate limit exceeded.";
+				throw new Error(message);
+			}
+
 			if (!res.ok) {
-				throw new Error(`OSV API returned ${res.status}: ${res.statusText}`);
+				// Try to parse error response
+				let errorMessage = `Snyk API returned ${res.status}: ${res.statusText}`;
+				try {
+					const errorData = await res.json();
+					const parsedError = SnykErrorSchema.safeParse(errorData);
+					if (parsedError.success && parsedError.data.errors.length > 0) {
+						errorMessage = parsedError.data.errors
+							.map((e) => e.detail)
+							.join(", ");
+					}
+				} catch {
+					// Use default error message
+				}
+				throw new Error(errorMessage);
 			}
 
 			return res;
-		}, `OSV batch query (${queries.length} packages)`);
+		}, `Snyk batch query (${purls.length} packages)`);
 
 		const data = await response.json();
-		const parsed = OSVBatchResponseSchema.parse(data);
+		const parsed = SnykIssuesResponseSchema.parse(data);
 
-		// Extract vulnerability IDs from batch response
-		for (const result of parsed.results) {
-			if (result.vulns) {
-				vulnerabilityIds.push(...result.vulns.map((v) => v.id));
-			}
-		}
-
-		const vulnCount = parsed.results.reduce(
-			(sum, r) => sum + (r.vulns?.length || 0),
-			0,
-		);
-		logger.info(
-			`Batch query found ${vulnCount} vulnerabilities across ${queries.length} packages`,
+		logger.debug(
+			`Batch query returned ${parsed.data.length} issues for ${purls.length} packages`,
 		);
 
-		return [...new Set(vulnerabilityIds)]; // Deduplicate IDs
+		return parsed.data;
 	}
 
 	/**
-	 * Query packages individually (fallback method)
+	 * Convert Snyk issues to internal vulnerability format
 	 */
-	private async queryIndividually(
-		queries: OSVQuery[],
-	): Promise<OSVVulnerability[]> {
-		const responses = await Promise.allSettled(
-			queries.map((query) => this.querySinglePackage(query)),
-		);
+	private convertIssuesToVulnerabilities(
+		issues: SnykIssuesResponse["data"],
+		_packageMap: Map<string, Bun.Security.Package>,
+	): SnykVulnerability[] {
+		const vulnerabilities: SnykVulnerability[] = [];
 
-		const vulnerabilities: OSVVulnerability[] = [];
-		let successCount = 0;
+		for (const issue of issues) {
+			const attrs = issue.attributes;
 
-		for (const response of responses) {
-			if (response.status === "fulfilled") {
-				vulnerabilities.push(...response.value);
-				successCount++;
+			// Extract severity
+			const severity = attrs.effectiveSeverityLevel || attrs.severity;
+
+			// Extract URL from references
+			let url: string | undefined;
+			if (attrs.references && attrs.references.length > 0) {
+				url = attrs.references[0]?.url;
 			}
+
+			// Extract description
+			const description = attrs.description || attrs.title;
+
+			// Create vulnerability object
+			const vulnerability: SnykVulnerability = {
+				id: issue.id,
+				title: attrs.title,
+				description,
+				severity,
+				cvssScore: attrs.cvssScore,
+				url,
+			};
+
+			vulnerabilities.push(vulnerability);
 		}
 
-		logger.info(
-			`Individual queries completed: ${successCount}/${queries.length} successful`,
-		);
 		return vulnerabilities;
-	}
-
-	/**
-	 * Query a single package with pagination support
-	 */
-	private async querySinglePackage(
-		query: OSVQuery,
-	): Promise<OSVVulnerability[]> {
-		const allVulns: OSVVulnerability[] = [];
-		let currentQuery = { ...query };
-
-		while (true) {
-			try {
-				const response = await withRetry(
-					async () => {
-						const res = await fetch(`${this.baseUrl}/query`, {
-							method: "POST",
-							headers: {
-								"Content-Type": HTTP.CONTENT_TYPE,
-								"User-Agent": HTTP.USER_AGENT,
-							},
-							body: JSON.stringify(currentQuery),
-							signal: AbortSignal.timeout(this.timeout),
-						});
-
-						if (!res.ok) {
-							throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-						}
-
-						return res;
-					},
-					`OSV query for ${query.package?.name || "unknown"}@${query.version || "unknown"}`,
-				);
-
-				const data = await response.json();
-				const parsed = OSVResponseSchema.parse(data);
-
-				// Add vulnerabilities from this page
-				if (parsed.vulns) {
-					allVulns.push(...parsed.vulns);
-				}
-
-				// Check for pagination
-				if (parsed.next_page_token) {
-					currentQuery = { ...query, page_token: parsed.next_page_token };
-				} else {
-					break; // No more pages
-				}
-			} catch (error) {
-				logger.warn(
-					`Query failed for ${query.package?.name || "unknown"}@${query.version || "unknown"}`,
-					{
-						error: error instanceof Error ? error.message : String(error),
-					},
-				);
-				break; // Exit pagination loop on error
-			}
-		}
-
-		return allVulns;
-	}
-
-	/**
-	 * Fetch detailed vulnerability information by IDs
-	 */
-	private async fetchVulnerabilityDetails(
-		ids: string[],
-	): Promise<OSVVulnerability[]> {
-		if (ids.length === 0) return [];
-
-		const uniqueIds = [...new Set(ids)]; // Deduplicate requests
-		logger.info(`Fetching details for ${uniqueIds.length} vulnerabilities`);
-
-		// Process in smaller chunks to avoid overwhelming the API
-		const chunkSize = PERFORMANCE.MAX_CONCURRENT_DETAILS;
-		const vulnerabilities: OSVVulnerability[] = [];
-
-		for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-			const chunk = uniqueIds.slice(i, i + chunkSize);
-			const chunkResults = await Promise.allSettled(
-				chunk.map((id) => this.fetchSingleVulnerability(id)),
-			);
-
-			for (const result of chunkResults) {
-				if (result.status === "fulfilled" && result.value) {
-					vulnerabilities.push(result.value);
-				}
-			}
-		}
-
-		logger.info(
-			`Retrieved ${vulnerabilities.length}/${uniqueIds.length} vulnerability details`,
-		);
-		return vulnerabilities;
-	}
-
-	/**
-	 * Fetch a single vulnerability by ID
-	 */
-	private async fetchSingleVulnerability(
-		id: string,
-	): Promise<OSVVulnerability | null> {
-		try {
-			return await withRetry(async () => {
-				const response = await fetch(`${this.baseUrl}/vulns/${id}`, {
-					headers: {
-						"User-Agent": HTTP.USER_AGENT,
-					},
-					signal: AbortSignal.timeout(this.timeout),
-				});
-
-				if (!response.ok) {
-					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-				}
-
-				const data = await response.json();
-				return OSVVulnerabilitySchema.parse(data);
-			}, `Get vulnerability ${id}`);
-		} catch (error) {
-			logger.warn(`Failed to fetch vulnerability ${id}`, {
-				error: error instanceof Error ? error.message : String(error),
-			});
-			return null;
-		}
 	}
 }

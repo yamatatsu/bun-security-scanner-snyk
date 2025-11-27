@@ -4,7 +4,7 @@
  */
 
 /**
- * Structured logging utilities for OSV Scanner
+ * Structured logging utilities for Snyk Scanner
  * Provides consistent, configurable logging with proper levels and context
  */
 
@@ -20,7 +20,7 @@ interface Logger {
 	error(message: string, context?: LogContext): void;
 }
 
-class OSVLogger implements Logger {
+class SnykLogger implements Logger {
 	private readonly levels = { debug: 0, info: 1, warn: 2, error: 3 };
 
 	private parseLogLevel(level?: string): LogLevel | null {
@@ -53,7 +53,7 @@ class OSVLogger implements Logger {
 		context?: LogContext,
 	): string {
 		const timestamp = new Date().toISOString();
-		const prefix = `[${timestamp}] OSV-${level.toUpperCase()}:`;
+		const prefix = `[${timestamp}] SNYK-${level.toUpperCase()}:`;
 		const contextStr = context ? ` ${this.safeStringify(context)}` : "";
 		return `${prefix} ${message}${contextStr}`;
 	}
@@ -83,4 +83,4 @@ class OSVLogger implements Logger {
 	}
 }
 
-export const logger = new OSVLogger();
+export const logger = new SnykLogger();

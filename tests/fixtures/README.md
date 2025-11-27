@@ -25,7 +25,7 @@ This directory contains test data used across the test suite.
 ### `sample-package.json`
 - Example package.json with realistic configuration
 - Used for testing package validation logic
-- Represents actual bun-osv-scanner package structure
+- Represents actual bun-security-scanner-snyk package structure
 
 ## Usage
 

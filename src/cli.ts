@@ -7,12 +7,12 @@ import { scanner } from "./index.js";
 import { logger } from "./logger.js";
 
 /**
- * CLI interface for testing and debugging the OSV scanner
+ * CLI interface for testing and debugging the Snyk scanner
  */
 
 function printUsage() {
 	console.log(`
-Bun OSV Scanner CLI
+Bun Snyk Scanner CLI
 
 Usage:
   bun run src/cli.ts test <package@version> [package@version...]
@@ -29,10 +29,17 @@ Examples:
   bun run src/cli.ts test event-stream@3.3.6
   bun run src/cli.ts scan ./package.json
 
-Environment Variables:
-  OSV_LOG_LEVEL     Set logging level (debug, info, warn, error)
-  OSV_TIMEOUT_MS    Set request timeout in milliseconds
-  OSV_DISABLE_BATCH Disable batch queries (true/false)
+Required Environment Variables:
+  SNYK_API_TOKEN    Your Snyk API token (required)
+  SNYK_ORG_ID       Your Snyk organization ID (required)
+
+Optional Environment Variables:
+  SNYK_LOG_LEVEL     Set logging level (debug, info, warn, error)
+  SNYK_TIMEOUT_MS    Set request timeout in milliseconds
+  SNYK_DISABLE_BATCH Disable batch queries (true/false)
+
+Note: This scanner requires a Snyk account with a paid plan.
+Setup instructions: https://docs.snyk.io/snyk-api/authentication-for-api
 `);
 }
 

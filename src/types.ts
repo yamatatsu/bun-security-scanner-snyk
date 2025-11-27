@@ -6,7 +6,7 @@
 // Bun Security Scanner API types
 // These will be moved to @types/bun when officially released
 
-// OSV API related types
+// Snyk API related types
 export type FatalSeverity = "CRITICAL" | "HIGH";
 
 // Extend global Bun namespace with missing types

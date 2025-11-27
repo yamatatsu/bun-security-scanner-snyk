@@ -9,7 +9,10 @@ import { scanner } from "../src/index.js";
 describe("Scanner", () => {
 	beforeEach(() => {
 		// Set log level to error to reduce test output
-		process.env.OSV_LOG_LEVEL = "error";
+		process.env.SNYK_LOG_LEVEL = "error";
+		// Set mock environment variables for Snyk API
+		process.env.SNYK_API_TOKEN = "test-token";
+		process.env.SNYK_ORG_ID = "test-org-id";
 	});
 
 	describe("Interface Compliance", () => {
